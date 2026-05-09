@@ -13,25 +13,6 @@ class UserModel extends Model
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
 
-    // protected $allowedFields = [
-    //     'name',
-    //     'email',
-    //     'password',
-    //     'role',
-    //     'student_id',
-    //     'course',
-    //     'year_level',
-    //     'section',
-    //     'phone',
-    //     'address',
-    //     'profile_image'
-    // ];
-
-    // public function updateProfile(int $userId, array $data): bool
-    // {
-    //     return $this->update($userId, $data);
-    // }
-
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;
 
@@ -44,8 +25,6 @@ class UserModel extends Model
     protected $updatedField  = 'updated_at';
     protected $deletedField  = 'deleted_at';
 
-    // protected $validationRules      = [];
-    // protected $validationMessages   = [];
     protected $skipValidation       = false;
     protected $cleanValidationRules = true;
 
@@ -59,60 +38,65 @@ class UserModel extends Model
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
 
-
     protected $allowedFields = [
-        'name', 'email', 'password',
-        'role_id',          // ← new: foreign key to roles table
-        'student_id', 'course', 'year_level', 'section',
-        'phone', 'address', 'profile_image',
+        'name',
+        'email',
+        'password',
+        'role_id',
+        'student_id',
+        'course',
+        'year_level',
+        'section',
+        'phone',
+        'address',
+        'profile_image',
     ];
 
-    // ── Validation (registration only) ───────────────────────
     protected $validationRules = [
         'name'     => 'required|min_length[2]|max_length[100]',
         'email'    => 'required|valid_email|is_unique[users.email]',
         'password' => 'required|min_length[8]',
     ];
 
-    // ── Custom methods ────────────────────────────────────────
-
     public function findByEmail(string $email): ?array
     {
         return $this->where('email', $email)->first();
     }
 
-    /**
-     * Return a user with their role name joined in.
-     * Uses a raw query join so we get role.name alongside user data.
-     *
-     * @param int $id  User ID
-     */
     public function findWithRole(int $id): ?array
     {
         return $this->db->table('users u')
-            ->select('u.*, r.name AS role_name, r.label AS role_label')
-            ->join('roles r', 'r.id = u.role_id', 'left')
+            ->select('u.*, r.role_name AS role_name')
+            ->join('user_role r', 'r.id = u.role_id', 'left')
             ->where('u.id', $id)
-            ->where('u.deleted_at IS NULL')
             ->get()
             ->getRowArray();
     }
 
-    /**
-     * Return all users with their role label joined in.
-     * Used by the Teacher/Admin student management page.
-     */
     public function getAllWithRoles(): array
     {
         return $this->db->table('users u')
             ->select('u.id, u.name, u.email, u.student_id, u.course,
                       u.year_level, u.section, u.created_at,
-                      r.name AS role_name, r.label AS role_label')
-            ->join('roles r', 'r.id = u.role_id', 'left')
-            ->where('u.deleted_at IS NULL')
+                      r.role_name AS role_name')
+            ->join('user_role r', 'r.id = u.role_id', 'left')
             ->orderBy('u.name', 'ASC')
             ->get()
             ->getResultArray();
+    }
+
+    public function getStudents(): array
+    {
+        return $this->select('id, name, email, student_id, course, year_level, section, phone, address, profile_image, role_id')
+            ->orderBy('name', 'ASC')
+            ->findAll();
+    }
+
+    public function getStudentById(int $id): ?array
+    {
+        return $this->select('id, name, email, student_id, course, year_level, section, phone, address, profile_image, role_id')
+            ->where('id', $id)
+            ->first();
     }
 
     public function updateProfile(int $userId, array $data): bool

@@ -83,8 +83,7 @@ $routes->group('admin', ['filter' => ['auth', 'admin']], function ($routes) {
 // ════════════════════════════════════════════════════════════
 
 // Issue token — no auth filter needed here
-$routes->post('api/v1/auth/token', 'Api\AuthController::issueToken');
-
+$routes->post('api/v1/auth/login', 'Api\AuthController::issueToken');
 // Protected API routes
 $routes->group('api/v1', ['filter' => 'api_auth'], function ($routes) {
 
@@ -110,4 +109,8 @@ $routes->group('', ['filter' => ['auth', 'teacher']], function ($routes) {
     $routes->post('/items/update/(:num)', 'ItemController::update/$1');
     $routes->get('/items/delete/(:num)',  'ItemController::delete/$1');
 
+});
+
+$routes->get('/makehash', function () {
+    echo password_hash('password123', PASSWORD_DEFAULT);
 });
