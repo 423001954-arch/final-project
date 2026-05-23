@@ -2,17 +2,123 @@
 
 namespace App\Controllers;
 
+use App\Models\HealthcareFacilityModel;
+use App\Models\MedicineBatchModel;
+use App\Models\MedicineModel;
 use App\Models\UserModel;
+use Config\Database;
 
 class Home extends BaseController
 {
     public function index()
     {
         $data = array_merge($this->data, [
-            'title' => 'Dashboard Page'
+            'title' => 'Healthcare Supply Chain Dashboard',
+            'dashboard' => $this->supplyChainDashboardData(),
         ]);
 
         return view('dashboard', $data);
+    }
+
+    private function supplyChainDashboardData(): array
+    {
+        $db = Database::connect();
+
+        if (! $db->tableExists('healthcare_facilities') || ! $db->tableExists('medicines') || ! $db->tableExists('medicine_batches')) {
+            return [
+                'is_ready' => false,
+                'message'  => 'Run the supply-chain migrations to activate facilities, medicines, batches, and stock movements.',
+            ];
+        }
+
+        $batchModel = new MedicineBatchModel();
+
+        $activeStock = (int) ($db->table('medicine_batches')
+            ->selectSum('available_quantity')
+            ->where('status', 'available')
+            ->where('expiry_date >', date('Y-m-d'))
+            ->get()
+            ->getRowArray()['available_quantity'] ?? 0);
+
+        $facilityCount = (new HealthcareFacilityModel())->where('is_active', 1)->countAllResults();
+        $medicineCount = (new MedicineModel())->where('status', 'active')->countAllResults();
+        $availableBatches = $batchModel->where('status', 'available')
+            ->where('available_quantity >', 0)
+            ->where('expiry_date >', date('Y-m-d'))
+            ->countAllResults();
+
+        $expired = $batchModel->expiredActiveBatches(5);
+        $expiringSoon = $db->table('medicine_batches b')
+            ->select('b.batch_number, b.expiry_date, b.available_quantity, b.warehouse_location, m.generic_name, f.name AS facility_name')
+            ->join('medicines m', 'm.id = b.medicine_id')
+            ->join('healthcare_facilities f', 'f.id = m.facility_id', 'left')
+            ->where('b.status', 'available')
+            ->where('b.available_quantity >', 0)
+            ->where('b.expiry_date >', date('Y-m-d'))
+            ->where('b.expiry_date <=', date('Y-m-d', strtotime('+30 days')))
+            ->orderBy('b.expiry_date', 'ASC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $recentMovements = [];
+        if ($db->tableExists('stock_movements')) {
+            $recentMovements = $db->table('stock_movements sm')
+                ->select('sm.movement_type, sm.quantity, sm.reference_type, sm.reference_id, sm.created_at, m.generic_name, b.batch_number, f.name AS facility_name')
+                ->join('medicines m', 'm.id = sm.medicine_id')
+                ->join('medicine_batches b', 'b.id = sm.batch_id')
+                ->join('healthcare_facilities f', 'f.id = sm.facility_id', 'left')
+                ->orderBy('sm.created_at', 'DESC')
+                ->limit(5)
+                ->get()
+                ->getResultArray();
+        }
+
+        return [
+            'is_ready' => true,
+            'metrics' => [
+                'active_stock'      => $activeStock,
+                'active_facilities' => $facilityCount,
+                'active_medicines'  => $medicineCount,
+                'available_batches' => $availableBatches,
+                'expired_batches'   => count($expired),
+            ],
+            'expiring_soon'    => $expiringSoon,
+            'expired_batches'  => $expired,
+            'recent_movements' => $recentMovements,
+            'workflow' => [
+                [
+                    'title' => 'Supply Intake',
+                    'status' => 'Admin records received stock with a unique Batch ID, expiry date, and warehouse location.',
+                    'endpoint' => 'POST /api/v1/medicine-batches',
+                ],
+                [
+                    'title' => 'Validation',
+                    'status' => 'The API rejects duplicate Batch IDs and expiry dates that are not in the future.',
+                    'endpoint' => 'MedicineBatchesController::create',
+                ],
+                [
+                    'title' => 'Storage Logic',
+                    'status' => 'Accepted stock is locked to the batch warehouse location and recorded as a receive movement.',
+                    'endpoint' => 'stock_movements',
+                ],
+                [
+                    'title' => 'Requisition',
+                    'status' => 'Clinic users request a medicine quantity for a facility.',
+                    'endpoint' => 'POST /api/v1/stock-allocations',
+                ],
+                [
+                    'title' => 'Smart Fulfillment',
+                    'status' => 'FEFO automatically chooses the closest valid expiry batch first.',
+                    'endpoint' => 'FefoStockAllocator',
+                ],
+                [
+                    'title' => 'Disposal Protocol',
+                    'status' => 'Expired active batches can be flagged with php spark supply:flag-expired.',
+                    'endpoint' => 'supply:flag-expired',
+                ],
+            ],
+        ];
     }
 
     public function dashboardV2()
@@ -102,12 +208,6 @@ class Home extends BaseController
         $rules = [
             'name'          => 'required|min_length[3]',
             'email'         => "required|valid_email|is_unique[users.email,id,{$userId}]",
-            'student_id'    => 'permit_empty|max_length[20]',
-            'course'        => 'permit_empty|max_length[100]',
-            'year_level'    => 'permit_empty|integer',
-            'section'       => 'permit_empty|max_length[50]',
-            'phone'         => 'permit_empty|max_length[20]',
-            'address'       => 'permit_empty',
             'profile_image' => 'if_exist|is_image[profile_image]|mime_in[profile_image,image/jpg,image/jpeg,image/png,image/webp]|max_size[profile_image,2048]'
         ];
 
@@ -118,12 +218,6 @@ class Home extends BaseController
         $updateData = [
             'name'       => $this->request->getPost('name'),
             'email'      => $this->request->getPost('email'),
-            'student_id' => $this->request->getPost('student_id'),
-            'course'     => $this->request->getPost('course'),
-            'year_level' => $this->request->getPost('year_level'),
-            'section'    => $this->request->getPost('section'),
-            'phone'      => $this->request->getPost('phone'),
-            'address'    => $this->request->getPost('address'),
         ];
 
         $file = $this->request->getFile('profile_image');
@@ -144,6 +238,12 @@ class Home extends BaseController
 
             $newName = 'avatar_' . $userId . '_' . time() . '.' . $file->getExtension();
             $file->move($uploadPath, $newName);
+
+            service('image')
+                ->withFile($uploadPath . $newName)
+                ->fit(320, 320, 'center')
+                ->save($uploadPath . $newName, 85);
+
             $updateData['profile_image'] = $newName;
         }
 

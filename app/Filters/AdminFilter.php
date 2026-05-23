@@ -4,6 +4,7 @@
 
 namespace App\Filters;
 
+use App\Services\RoleAccess;
 use CodeIgniter\Filters\FilterInterface;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
@@ -35,8 +36,8 @@ class AdminFilter implements FilterInterface
     {
         $role = session('user')['role'] ?? null;
 
-        if ($role !== 'admin') {
-            session()->setFlashdata('error', 'Access denied. Administrator privileges required.');
+        if (! RoleAccess::canManageUsers($role)) {
+            session()->setFlashdata('error', 'Access denied. SuperAdmin privileges required.');
             return redirect()->to('/unauthorized');
         }
     }

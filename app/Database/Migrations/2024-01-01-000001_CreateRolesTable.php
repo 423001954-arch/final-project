@@ -11,7 +11,7 @@ use CodeIgniter\Database\Migration;
  *
  * Creates the 'roles' table which stores all role definitions.
  * The 'name' column is the slug used by Filter classes
- * (e.g. 'admin', 'teacher', 'student', 'coordinator').
+ * (e.g. 'superadmin', 'manager', 'staff').
  *
  * Run with:  php spark migrate
  * Rollback:  php spark migrate:rollback
@@ -28,7 +28,7 @@ class CreateRolesTable extends Migration
                 'auto_increment' => true,
             ],
             // Slug used by Filter classes — must be lowercase, no spaces
-            // e.g. 'admin', 'teacher', 'student', 'coordinator'
+            // e.g. 'superadmin', 'manager', 'staff'
             'name' => [
                 'type'       => 'VARCHAR',
                 'constraint' => 50,

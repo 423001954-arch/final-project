@@ -47,9 +47,9 @@
                         <td>
                             <?php
                             $badgeColor = match($user['role_name'] ?? '') {
-                                'admin'   => 'danger',
-                                'teacher' => 'success',
-                                'student' => 'primary',
+                                'superadmin' => 'danger',
+                                'manager' => 'success',
+                                'staff' => 'primary',
                                 default   => 'secondary',
                             };
                             ?>

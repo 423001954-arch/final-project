@@ -37,7 +37,7 @@
                         <label for="name" class="form-label fw-semibold">
                             Role Slug <span class="text-danger">*</span>
                         </label>
-                        <?php $isCore = in_array($role['name'], ['admin', 'teacher', 'student']); ?>
+                        <?php $isCore = in_array($role['name'], ['superadmin', 'manager', 'staff'], true); ?>
                         <input type="text" id="name" name="name"
                                class="form-control font-monospace <?= isset($errors['name']) ? 'is-invalid' : '' ?>"
                                value="<?= old('name', esc($role['name'])) ?>"

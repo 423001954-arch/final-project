@@ -43,12 +43,6 @@ class UserModel extends Model
         'email',
         'password',
         'role_id',
-        'student_id',
-        'course',
-        'year_level',
-        'section',
-        'phone',
-        'address',
         'profile_image',
     ];
 
@@ -63,11 +57,21 @@ class UserModel extends Model
         return $this->where('email', $email)->first();
     }
 
+    public function findByEmailWithRole(string $email): ?array
+    {
+        return $this->db->table('users u')
+            ->select('u.*, r.name AS role_name, r.label AS role_label')
+            ->join('roles r', 'r.id = u.role_id', 'left')
+            ->where('u.email', $email)
+            ->get()
+            ->getRowArray();
+    }
+
     public function findWithRole(int $id): ?array
     {
         return $this->db->table('users u')
-            ->select('u.*, r.role_name AS role_name')
-            ->join('user_role r', 'r.id = u.role_id', 'left')
+            ->select('u.*, r.name AS role_name, r.label AS role_label')
+            ->join('roles r', 'r.id = u.role_id', 'left')
             ->where('u.id', $id)
             ->get()
             ->getRowArray();
@@ -76,27 +80,12 @@ class UserModel extends Model
     public function getAllWithRoles(): array
     {
         return $this->db->table('users u')
-            ->select('u.id, u.name, u.email, u.student_id, u.course,
-                      u.year_level, u.section, u.created_at,
-                      r.role_name AS role_name')
-            ->join('user_role r', 'r.id = u.role_id', 'left')
+            ->select('u.id, u.name, u.email, u.created_at,
+                      r.name AS role_name, r.label AS role_label')
+            ->join('roles r', 'r.id = u.role_id', 'left')
             ->orderBy('u.name', 'ASC')
             ->get()
             ->getResultArray();
-    }
-
-    public function getStudents(): array
-    {
-        return $this->select('id, name, email, student_id, course, year_level, section, phone, address, profile_image, role_id')
-            ->orderBy('name', 'ASC')
-            ->findAll();
-    }
-
-    public function getStudentById(int $id): ?array
-    {
-        return $this->select('id, name, email, student_id, course, year_level, section, phone, address, profile_image, role_id')
-            ->where('id', $id)
-            ->first();
     }
 
     public function updateProfile(int $userId, array $data): bool

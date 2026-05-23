@@ -46,5 +46,6 @@ class MainSeeder extends Seeder
         // Order matters — roles must exist before users reference them
         $this->call(RoleSeeder::class);
         $this->call(UserSeeder::class);
+        $this->call(SupplyChainSeeder::class);
     }
 }

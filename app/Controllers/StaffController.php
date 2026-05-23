@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Models\UserModel;
 
-class StudentController extends BaseController
+class StaffController extends BaseController
 {
     public function dashboard()
     {
@@ -14,14 +14,14 @@ class StudentController extends BaseController
             return redirect()->to('/login');
         }
 
-        $userModel = new UserModel();
-        $user = $userModel->where('email', $sessionUser['email'])->first();
+        $user = (new UserModel())->where('email', $sessionUser['email'])->first();
 
         if (! $user) {
             session()->destroy();
+
             return redirect()->to('/login');
         }
 
-        return view('student/dashboard', ['user' => $user]);
+        return view('staff/dashboard', ['user' => $user]);
     }
 }

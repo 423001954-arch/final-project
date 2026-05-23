@@ -25,7 +25,7 @@ class UserManagement extends Migration
 
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('user_menu_category');
+        $this->forge->createTable('user_menu_category', true);
 
         // Create user menu table
         $this->forge->addField([
@@ -58,7 +58,7 @@ class UserManagement extends Migration
 
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('user_menu');
+        $this->forge->createTable('user_menu', true);
 
         // Create user submenu table
         $this->forge->addField([
@@ -84,7 +84,7 @@ class UserManagement extends Migration
 
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('user_submenu');
+        $this->forge->createTable('user_submenu', true);
 
         // Create user role table
         $this->forge->addField([
@@ -101,42 +101,7 @@ class UserManagement extends Migration
 
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('user_role');
-
-        // Create users table              
-        $this->forge->addField([
-            'id'          => [
-                'type'           => 'INT',
-                'constraint'     => 11,
-                'unsigned'       => true,
-                'auto_increment' => true,
-            ],
-            'fullname'       => [
-                'type'       => 'VARCHAR',
-                'constraint' => '255',
-            ],
-            'username' => [
-                'type' => 'VARCHAR',
-                'constraint' => '255',
-            ],
-            'password' => [
-                'type' => 'VARCHAR',
-                'constraint' => '255',
-            ],
-            'role' => [
-                'type'           => 'INT',
-                'constraint'     => 5,
-                'unsigned'       => true,
-            ],
-            'created_at' => [
-                'type'           => 'datetime'
-            ],
-            'updated_at' => [
-                'type'           => 'datetime'
-            ],
-        ]);
-        $this->forge->addKey('id', true);
-        $this->forge->createTable('users');
+        $this->forge->createTable('user_role', true);
 
         // Create user access table
         $this->forge->addField([
@@ -169,7 +134,7 @@ class UserManagement extends Migration
 
         ]);
         $this->forge->addKey('id', true);
-        $this->forge->createTable('user_access');
+        $this->forge->createTable('user_access', true);
     }
 
     public function down()

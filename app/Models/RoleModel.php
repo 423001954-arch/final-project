@@ -10,7 +10,7 @@ use CodeIgniter\Model;
  * RoleModel
  *
  * Manages the 'roles' table.
- * The 'name' column stores a slug (e.g. 'admin', 'teacher', 'student')
+ * The 'name' column stores a slug (e.g. 'superadmin', 'manager', 'staff')
  * which is what Filters compare against session data.
  */
 class RoleModel extends Model

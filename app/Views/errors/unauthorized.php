@@ -33,8 +33,8 @@
             $role = session('user')['role'] ?? null;
             $home = match($role) {
                 'admin'   => '/dashboard',
-                'teacher' => '/dashboard',
-                'student' => '/student/dashboard',
+                'manager' => '/dashboard',
+                'staff' => '/staff/dashboard',
                 default   => '/login',
             };
             ?>

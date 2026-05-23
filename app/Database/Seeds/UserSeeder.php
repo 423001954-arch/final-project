@@ -1,89 +1,67 @@
 <?php
 
-// app/Database/Seeds/UserSeeder.php
-
 namespace App\Database\Seeds;
 
 use CodeIgniter\Database\Seeder;
 
-/**
- * UserSeeder
- *
- * Inserts 4 demo user accounts — one per role — for testing RBAC.
- * All accounts use the password: Password1
- *
- * Run with:  php spark db:seed UserSeeder
- *
- * ┌─────────────────────────┬──────────────────────────┬────────────┐
- * │ Role                    │ Email                    │ Password   │
- * ├─────────────────────────┼──────────────────────────┼────────────┤
- * │ Administrator           │ admin@school.edu         │ Password1  │
- * │ Teacher                 │ teacher@school.edu       │ Password1  │
- * │ Student                 │ student@school.edu       │ Password1  │
- * │ Coordinator (challenge) │ coordinator@school.edu   │ Password1  │
- * └─────────────────────────┴──────────────────────────┴────────────┘
- *
- * IMPORTANT: Run RoleSeeder FIRST so role IDs exist before this seeder
- * tries to look them up. Use MainSeeder (which calls both in order) to
- * avoid errors.
- */
 class UserSeeder extends Seeder
 {
     public function run(): void
     {
         $now = date('Y-m-d H:i:s');
 
-        // Look up role IDs dynamically — avoids hard-coded IDs that
-        // may differ if the seeder is run on a fresh vs. existing DB
         $getRoleId = function (string $slug): ?int {
             $row = $this->db->table('roles')->where('name', $slug)->get()->getRowArray();
+
             return $row ? (int) $row['id'] : null;
         };
 
-        // Hash the shared demo password using CI4's recommended approach:
-        // password_hash() with PASSWORD_BCRYPT (cost factor defaults to 10)
-        // password_verify() should be used to check this hash on login
         $hash = password_hash('Password1', PASSWORD_BCRYPT);
 
         $users = [
             [
-                'name'       => 'Admin User',
-                'email'      => 'admin@school.edu',
+                'name'       => 'Supply Chain SuperAdmin',
+                'email'      => 'superadmin@healthchain.local',
                 'password'   => $hash,
-                'role_id'    => $getRoleId('admin'),
-                'created_at' => $now,
-                'updated_at' => $now,
-                'deleted_at' => null,       // NULL = active (not soft-deleted)
-            ],
-            [
-                'name'       => 'Teacher Cruz',
-                'email'      => 'teacher@school.edu',
-                'password'   => $hash,
-                'role_id'    => $getRoleId('teacher'),
+                'role_id'    => $getRoleId('superadmin'),
                 'created_at' => $now,
                 'updated_at' => $now,
                 'deleted_at' => null,
             ],
             [
-                'name'       => 'Student Reyes',
-                'email'      => 'student@school.edu',
+                'name'       => 'Warehouse Manager',
+                'email'      => 'manager@healthchain.local',
                 'password'   => $hash,
-                'role_id'    => $getRoleId('student'),
+                'role_id'    => $getRoleId('manager'),
                 'created_at' => $now,
                 'updated_at' => $now,
                 'deleted_at' => null,
             ],
             [
-                'name'       => 'Coordinator Bautista',
-                'email'      => 'coordinator@school.edu',
+                'name'       => 'Clinic Staff',
+                'email'      => 'staff@healthchain.local',
                 'password'   => $hash,
-                'role_id'    => $getRoleId('coordinator'),
+                'role_id'    => $getRoleId('staff'),
                 'created_at' => $now,
                 'updated_at' => $now,
                 'deleted_at' => null,
             ],
         ];
 
-        $this->db->table('users')->insertBatch($users);
+        foreach ($users as $user) {
+            $existing = $this->db->table('users')
+                ->where('email', $user['email'])
+                ->get()
+                ->getRowArray();
+
+            if ($existing) {
+                $update = $user;
+                unset($update['created_at']);
+                $this->db->table('users')->where('id', $existing['id'])->update($update);
+                continue;
+            }
+
+            $this->db->table('users')->insert($user);
+        }
     }
 }

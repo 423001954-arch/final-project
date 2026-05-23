@@ -1,18 +1,26 @@
 <?php
 
-// app/Controllers/AuthController.php  (UPDATED for RBAC)
 
 namespace App\Controllers;
 
 use App\Models\RoleModel;
 use App\Models\UserModel;
+use App\Services\RoleAccess;
 
 class AuthController extends BaseController
 {
     public function login()
     {
         if (session()->has('user')) {
-            return $this->redirectByRole(session('user')['role']);
+            $role = RoleAccess::normalize(session('user')['role'] ?? null);
+
+            if (! in_array($role, ['superadmin', 'manager', 'staff'], true)) {
+                session()->destroy();
+
+                return redirect()->to('/login');
+            }
+
+            return $this->redirectByRole($role);
         }
         return view('auth/login');
     }
@@ -26,14 +34,35 @@ class AuthController extends BaseController
             'password' => 'required',
         ];
 
+        // Safely extract payload for both Postman (JSON) and Web (POST Data)
+        $json = $this->request->getJSON();
+        $email = $json->email ?? $this->request->getPost('email');
+        $password = $json->password ?? $this->request->getPost('password');
+
         if (! $this->validate($rules)) {
+            // Return JSON if requested via Postman
+            if ($this->request->is('json')) {
+                return $this->response->setJSON([
+                    'status' => 400,
+                    'errors' => $this->validator->getErrors()
+                ])->setStatusCode(400);
+            }
+
             return redirect()->back()->withInput()
                              ->with('errors', $this->validator->getErrors());
         }
 
-        $found = $userModel->findByEmailWithRole($this->request->getPost('email'));
+        // Pass the extracted string to the model, fixing the null TypeError
+        $found = $userModel->findByEmailWithRole($email);
 
-        if (! $found || ! password_verify($this->request->getPost('password'), $found['password'])) {
+        if (! $found || ! password_verify($password, $found['password'])) {
+            if ($this->request->is('json')) {
+                return $this->response->setJSON([
+                    'status' => 401,
+                    'error'  => 'Invalid email or password.'
+                ])->setStatusCode(401);
+            }
+
             return redirect()->back()->withInput()
                              ->with('error', 'Invalid email or password.');
         }
@@ -44,12 +73,22 @@ class AuthController extends BaseController
                 'id'    => $found['id'],
                 'name'  => $found['name'],
                 'email' => $found['email'],
-                'role'  => $found['role_name'] ?? 'student',  // ← key for filters
+                'role'  => RoleAccess::normalize($found['role_name']) ?? 'staff',
             ],
         ]);
 
+        // Success response for Postman
+        if ($this->request->is('json')) {
+            return $this->response->setJSON([
+                'status'  => 200,
+                'message' => 'Login successful',
+                'user'    => session('user')
+            ])->setStatusCode(200);
+        }
+
+        // Success response for Web Browser
         session()->setFlashdata('success', 'Welcome, ' . $found['name'] . '!');
-        return $this->redirectByRole($found['role_name'] ?? 'student');
+        return $this->redirectByRole($found['role_name'] ?? 'staff');
     }
 
     /**
@@ -57,10 +96,10 @@ class AuthController extends BaseController
      */
     protected function redirectByRole(?string $role): \CodeIgniter\HTTP\RedirectResponse
     {
-        return match ($role) {
-            'admin'   => redirect()->to('/dashboard'),
-            'teacher' => redirect()->to('/dashboard'),
-            'student' => redirect()->to('/student/dashboard'),
+        return match (RoleAccess::normalize($role)) {
+            'superadmin' => redirect()->to('/dashboard'),
+            'manager' => redirect()->to('/dashboard'),
+            'staff' => redirect()->to('/staff/dashboard'),
             default   => redirect()->to('/login'),
         };
     }
@@ -68,7 +107,15 @@ class AuthController extends BaseController
     public function register()
     {
         if (session()->has('user')) {
-            return $this->redirectByRole(session('user')['role']);
+            $role = RoleAccess::normalize(session('user')['role'] ?? null);
+
+            if (! in_array($role, ['superadmin', 'manager', 'staff'], true)) {
+                session()->destroy();
+
+                return redirect()->to('/register');
+            }
+
+            return $this->redirectByRole($role);
         }
         return view('auth/register');
     }
@@ -84,20 +131,39 @@ class AuthController extends BaseController
             'confirm_password' => 'required|matches[password]',
         ];
 
+        // Safely extract payload for both Postman (JSON) and Web (POST Data)
+        $json = $this->request->getJSON();
+        $name = $json->name ?? $this->request->getPost('name');
+        $email = $json->email ?? $this->request->getPost('email');
+        $password = $json->password ?? $this->request->getPost('password');
+
         if (! $this->validate($rules, ['confirm_password' => ['matches' => 'Passwords do not match.']])) {
+            if ($this->request->is('json')) {
+                return $this->response->setJSON([
+                    'status' => 400,
+                    'errors' => $this->validator->getErrors()
+                ])->setStatusCode(400);
+            }
+
             return redirect()->back()->withInput()
                              ->with('errors', $this->validator->getErrors());
         }
 
-        // Get the student role ID (new registrations default to student)
-        $studentRole = (new RoleModel())->findByName('student');
+        $staffRole = (new RoleModel())->findByName('staff');
 
         $userModel->insert([
-            'name'     => $this->request->getPost('name'),
-            'email'    => $this->request->getPost('email'),
-            'password' => password_hash($this->request->getPost('password'), PASSWORD_BCRYPT),
-            'role_id'  => $studentRole['id'] ?? null,
+            'name'     => $name,
+            'email'    => $email,
+            'password' => password_hash($password, PASSWORD_BCRYPT),
+            'role_id'  => $staffRole['id'] ?? null,
         ]);
+
+        if ($this->request->is('json')) {
+            return $this->response->setJSON([
+                'status'  => 201,
+                'message' => 'Registration successful! Please log in.'
+            ])->setStatusCode(201);
+        }
 
         session()->setFlashdata('success', 'Registration successful! Please log in.');
         return redirect()->to('/login');
@@ -106,6 +172,14 @@ class AuthController extends BaseController
     public function logout()
     {
         session()->destroy();
+
+        if ($this->request->is('json')) {
+            return $this->response->setJSON([
+                'status'  => 200,
+                'message' => 'Logged out successfully.'
+            ])->setStatusCode(200);
+        }
+
         session()->setFlashdata('success', 'Logged out successfully.');
         return redirect()->to('/login');
     }

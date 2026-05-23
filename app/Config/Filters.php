@@ -1,9 +1,13 @@
 <?php
 
-// app/Config/Filters.php
-
 namespace Config;
 
+use App\Filters\AdminFilter;
+use App\Filters\ApiAuthFilter;
+use App\Filters\AuthFilter;
+use App\Filters\ManagerFilter;
+use App\Filters\StaffFilter;
+use App\Filters\XssFilter;
 use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Filters\CSRF;
 use CodeIgniter\Filters\DebugToolbar;
@@ -11,45 +15,20 @@ use CodeIgniter\Filters\Honeypot;
 use CodeIgniter\Filters\InvalidChars;
 use CodeIgniter\Filters\SecureHeaders;
 
-// ── Our custom filters ────────────────────────────────────────
-use App\Filters\AuthFilter;
-use App\Filters\StudentFilter;
-use App\Filters\TeacherFilter;
-use App\Filters\AdminFilter;
-use App\Filters\ApiAuthFilter;
-
 class Filters extends BaseConfig
 {
-    /**
-     * Filter aliases.
-     *
-     * The key is the alias used in Routes.php.
-     * The value is the fully-qualified class name.
-     *
-     * Naming convention:
-     *  'auth'    → must be logged in (any role)
-     *  'student' → must be logged in AND have role = 'student'
-     *  'teacher' → must be logged in AND have role IN ['teacher','admin']
-     *  'admin'   → must be logged in AND have role = 'admin'
-     *
-     * In Routes.php, filters are stacked:
-     *   ['filter' => 'auth|student']  means BOTH filters run in order.
-     */
     public array $aliases = [
         'csrf'          => CSRF::class,
         'toolbar'       => DebugToolbar::class,
         'honeypot'      => Honeypot::class,
         'invalidchars'  => InvalidChars::class,
         'secureheaders' => SecureHeaders::class,
-
-        // Custom RBAC filters
-        'auth'     => AuthFilter::class,
-        'student'  => StudentFilter::class,
-        'teacher'  => TeacherFilter::class,
-        'admin'    => AdminFilter::class,
-
-        // API Bearer-token filter
-        'api_auth' => ApiAuthFilter::class,
+        'auth'          => AuthFilter::class,
+        'staff'         => StaffFilter::class,
+        'manager'       => ManagerFilter::class,
+        'superadmin'    => AdminFilter::class,
+        'xss'           => XssFilter::class,
+        'api_auth'      => ApiAuthFilter::class,
     ];
 
     public array $required = [
@@ -58,8 +37,21 @@ class Filters extends BaseConfig
     ];
 
     public array $globals = [
-        'before' => [],
-        'after'  => [],
+        'before' => [
+            // Added explicit exceptions for Postman testing routes
+            'csrf' => [
+                'except' => [
+                    'api/*',
+                    'login',
+                    'register',
+                    'supply/*'
+                ]
+            ],
+            'xss',
+        ],
+        'after'  => [
+            'secureheaders',
+        ],
     ];
 
     public array $methods = [];

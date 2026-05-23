@@ -39,13 +39,13 @@
                         </label>
                         <input type="text" id="name" name="name"
                                class="form-control font-monospace <?= isset($errors['name']) ? 'is-invalid' : '' ?>"
-                               placeholder="e.g. coordinator, librarian"
+                               placeholder="e.g. inventory_auditor"
                                value="<?= old('name') ?>"
                                oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g,'')"
                                required>
                         <div class="form-text">
                             Lowercase letters, numbers, hyphens, underscores only.
-                            This is what Filters compare against — e.g. <code>session('user')['role'] === 'coordinator'</code>
+                            This is what filters compare against, for example <code>session('user')['role'] === 'manager'</code>.
                         </div>
                         <?php if (isset($errors['name'])): ?>
                             <div class="invalid-feedback"><?= esc($errors['name']) ?></div>
@@ -59,7 +59,7 @@
                         </label>
                         <input type="text" id="label" name="label"
                                class="form-control <?= isset($errors['label']) ? 'is-invalid' : '' ?>"
-                               placeholder="e.g. Department Coordinator"
+                               placeholder="e.g. Inventory Auditor"
                                value="<?= old('label') ?>"
                                required>
                         <div class="form-text">Human-readable name shown in the UI and navbar badge.</div>
