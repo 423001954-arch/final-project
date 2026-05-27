@@ -13,22 +13,88 @@ use RuntimeException;
 class SupplyChainController extends BaseController
 {
     /**
-     * Helper to return responses consistently for both API and Web
+     * Helper to return responses consistently for both API (Postman) and Web (Browser)
      */
     private function respond(int $status, string $message, array $data = [], bool $isError = false)
     {
-        if ($this->request->is('json')) {
+        if ($this->request->is('json') || strpos($this->request->getHeaderLine('Content-Type'), 'application/json') !== false) {
             return $this->response->setJSON(['status' => $status, 'message' => $message, 'data' => $data])->setStatusCode($status);
         }
         
         $key = $isError ? 'error' : 'success';
-        return redirect()->back()->with($key, $message)->with('data', $data);
+        return redirect()->back()->with($key, $message)->with('data', $data)->withInput();
     }
+
+    // ==============================================================================
+    // WEB UI ROUTE METHODS (These load your Dashboard pages)
+    // ==============================================================================
+
+    public function index()
+    {
+        if (!RoleAccess::canOperateSupplyChain(session('user')['role'] ?? null)) {
+            return redirect()->to('/unauthorized');
+        }
+
+        $batchModel = new MedicineBatchModel();
+
+        return view('supply/index', [
+            'title'      => 'Supply Operations',
+            'facilities' => (new HealthcareFacilityModel())->orderBy('name', 'ASC')->findAll(),
+            'medicines'  => (new MedicineModel())->orderBy('generic_name', 'ASC')->findAll(),
+            'batches'    => $batchModel
+                ->select('medicine_batches.*, medicines.generic_name, medicines.sku, healthcare_facilities.name AS facility_name')
+                ->join('medicines', 'medicines.id = medicine_batches.medicine_id')
+                ->join('healthcare_facilities', 'healthcare_facilities.id = medicines.facility_id', 'left')
+                ->orderBy('expiry_date', 'ASC')
+                ->findAll(25),
+            'expired'    => $batchModel->expiredActiveBatches(25),
+            'movements'  => $this->recentMovements(),
+        ]);
+    }
+
+    public function intake()
+    {
+        if (!RoleAccess::canOperateSupplyChain(session('user')['role'] ?? null)) {
+            return redirect()->to('/unauthorized');
+        }
+
+        return view('supply/intake', [
+            'title'     => 'Supply Intake',
+            'medicines' => (new MedicineModel())->orderBy('generic_name', 'ASC')->findAll(),
+        ]);
+    }
+
+    public function requisition()
+    {
+        return view('supply/requisition', [
+            'title'      => 'Clinic Requisition',
+            'facilities' => (new HealthcareFacilityModel())->orderBy('name', 'ASC')->findAll(),
+            'medicines'  => (new MedicineModel())->orderBy('generic_name', 'ASC')->findAll(),
+        ]);
+    }
+
+    public function disposal()
+    {
+        if (!RoleAccess::canOperateSupplyChain(session('user')['role'] ?? null)) {
+            return redirect()->to('/unauthorized');
+        }
+
+        $batchModel = new MedicineBatchModel();
+
+        return view('supply/disposal', [
+            'title'   => 'Expiry Disposal',
+            'expired' => $batchModel->expiredActiveBatches(100),
+        ]);
+    }
+
+    // ==============================================================================
+    // HYBRID DATA PROCESSING METHODS (Handles Form Submits AND Postman API)
+    // ==============================================================================
 
     public function storeIntake()
     {
         if (!RoleAccess::canOperateSupplyChain(session('user')['role'] ?? null)) {
-            return $this->respond(403, 'Unauthorized access.');
+            return $this->respond(403, 'Unauthorized access.', [], true);
         }
 
         // Use getVar() to support both JSON and Form Data
@@ -50,57 +116,5 @@ class SupplyChainController extends BaseController
             'expiry_date'        => 'required|valid_date[Y-m-d]',
         ];
 
-        if (!$this->validate($rules)) {
-            return $this->respond(400, 'Validation failed.', $this->validator->getErrors(), true);
-        }
-
-        $db = db_connect();
-        $db->transStart();
-
-        $batchModel = new MedicineBatchModel();
-        $quantity = (int) $data['received_quantity'];
-        
-        $batchId = $batchModel->insert([
-            'medicine_id'        => (int) $data['medicine_id'],
-            'batch_number'       => strtoupper(trim($data['batch_number'])),
-            'warehouse_location' => trim($data['warehouse_location']),
-            'received_quantity'  => $quantity,
-            'available_quantity' => $quantity,
-            'expiry_date'        => $data['expiry_date'],
-            'status'             => 'available',
-        ]);
-
-        (new StockMovementModel())->insert([
-            'batch_id'      => (int) $batchId,
-            'movement_type' => 'receive',
-            'quantity'      => $quantity,
-            'performed_by'  => session('user')['id'] ?? 0,
-        ]);
-
-        $db->transComplete();
-
-        return $this->respond(201, 'Stock intake successfully recorded.');
-    }
-
-    public function fulfillRequisition()
-    {
-        $rules = ['facility_id' => 'required', 'medicine_id' => 'required', 'quantity' => 'required'];
-        if (!$this->validate($rules)) {
-            return $this->respond(400, 'Invalid request.', $this->validator->getErrors(), true);
-        }
-
-        try {
-            $result = (new FefoStockAllocator())->commitConsumption(
-                (int)$this->request->getVar('facility_id'),
-                (int)$this->request->getVar('medicine_id'),
-                (int)$this->request->getVar('quantity'),
-                (int)(session('user')['id'] ?? 0),
-                'clinic_requisition',
-                'REQ-' . date('Ymd-His')
-            );
-            return $this->respond(200, 'Requisition fulfilled.', $result);
-        } catch (RuntimeException $e) {
-            return $this->respond(422, $e->getMessage(), [], true);
-        }
-    }
-}
+        // validateData is safe for array inputs regardless of whether it's JSON or POST
+        if (!$this->validateData($data, $rules)) {
