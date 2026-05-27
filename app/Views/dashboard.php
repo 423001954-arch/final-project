@@ -30,6 +30,11 @@
         border-radius: 0 8px 8px 0;
         height: 100%;
     }
+    .endpoint {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: .82rem;
+        color: #475569;
+    }
 </style>
 
 <div class="ops-hero mb-4">
@@ -60,7 +65,7 @@
         <div class="col-sm-6 col-xl-3">
             <div class="ops-metric">
                 <span class="text-muted small">Active Stock Units</span>
-                <strong class="text-success my-1"><?= number_format($metrics['active_stock']) ?></strong>
+                <strong><?= number_format($metrics['active_stock']) ?></strong>
                 <span class="small text-success">Available, non-expired stock</span>
             </div>
         </div>
@@ -68,7 +73,6 @@
             <div class="ops-metric">
                 <span class="text-muted small">Available Batches</span>
                 <strong><?= number_format($metrics['available_batches']) ?></strong>
-                <span class="small text-muted">FEFO eligible lots</span>
             </div>
         </div>
         <div class="col-sm-6 col-xl-3">
@@ -95,8 +99,9 @@
                     <div class="col-md-6">
                         <div class="workflow-step">
                             <h3 class="h6 fw-bold mb-2"><?= esc($step['title']) ?></h3>
-                            <p class="small text-muted mb-0"><?= esc($step['status']) ?></p>
-                            </div>
+                            <p class="small mb-2"><?= esc($step['status']) ?></p>
+                            <div class="endpoint"><?= esc($step['endpoint']) ?></div>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -118,8 +123,8 @@
                                     <div class="small text-muted"><?= esc($item['facility_name'] ?? 'No facility') ?> · <?= esc($item['warehouse_location'] ?? 'Main Warehouse') ?></div>
                                 </div>
                                 <div class="text-end small">
-                                    <div class="badge bg-light text-dark border mb-1"><?= esc($item['batch_number']) ?></div>
-                                    <div class="text-danger fw-bold"><?= esc($item['expiry_date']) ?></div>
+                                    <div><?= esc($item['batch_number']) ?></div>
+                                    <div class="text-danger"><?= esc($item['expiry_date']) ?></div>
                                 </div>
                             </div>
                         </div>
@@ -131,8 +136,6 @@
                 <div class="card-header bg-white fw-semibold">Expired Active Stock</div>
                 <div class="card-body">
                     <div class="display-6 fw-bold text-danger"><?= number_format($metrics['expired_batches']) ?></div>
-                    <p class="small text-muted mb-2">Run this background check to remove expired batches from active FEFO stock:</p>
-                    <code class="bg-light p-2 rounded d-block text-dark border">php spark supply:flag-expired</code>
                 </div>
             </div>
         </div>
@@ -155,23 +158,16 @@
                 <tbody>
                     <?php if ($dashboard['recent_movements'] === []): ?>
                         <tr>
-                            <td colspan="6" class="text-muted small text-center py-3">No stock movement history yet.</td>
+                            <td colspan="6" class="text-muted small">No stock movement history yet.</td>
                         </tr>
                     <?php endif; ?>
                     <?php foreach ($dashboard['recent_movements'] as $movement): ?>
-                        <?php 
-                            $mType = strtoupper($movement['movement_type'] ?? '');
-                            $badgeClass = 'bg-secondary';
-                            if (strpos($mType, 'IN') !== false || strpos($mType, 'RECEIVE') !== false) $badgeClass = 'bg-success-subtle text-success';
-                            if (strpos($mType, 'OUT') !== false || strpos($mType, 'DISPOSAL') !== false) $badgeClass = 'bg-danger-subtle text-danger';
-                            if (strpos($mType, 'ALLOCATE') !== false || strpos($mType, 'REQ') !== false) $badgeClass = 'bg-primary-subtle text-primary';
-                        ?>
                         <tr>
-                            <td><span class="badge <?= $badgeClass ?> text-uppercase"><?= esc($mType) ?></span></td>
-                            <td class="fw-semibold"><?= esc($movement['generic_name']) ?></td>
-                            <td><span class="font-monospace text-muted small"><?= esc($movement['batch_number']) ?></span></td>
+                            <td><span class="badge text-bg-secondary"><?= esc($movement['movement_type']) ?></span></td>
+                            <td><?= esc($movement['generic_name']) ?></td>
+                            <td><?= esc($movement['batch_number']) ?></td>
                             <td><?= esc($movement['facility_name'] ?? 'No facility') ?></td>
-                            <td class="text-end fw-bold"><?= number_format((int) $movement['quantity']) ?></td>
+                            <td class="text-end"><?= number_format((int) $movement['quantity']) ?></td>
                             <td class="small text-muted">
                                 <?= esc(trim(($movement['reference_type'] ?? '') . ' ' . ($movement['reference_id'] ?? ''))) ?>
                             </td>
